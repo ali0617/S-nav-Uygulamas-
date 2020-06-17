@@ -1,0 +1,176 @@
+sing System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Mvc;
+using Excel = Microsoft.Office.Interop.Excel;
+using ImportExcelFileInASPNETMVC.Models;
+using System.IO;
+using iTextSharp.text;
+using iTextSharp.text.pdf;
+using iTextSharp.tool.xml;
+using iTextSharp.text.html.simpleparser;
+
+namespace ImportExcelFileInASPNETMVC.Controllers
+{
+    public class HomeController : Controller
+    {
+        public int derslikMevcudu;
+
+        List<DersModel> dersModel = new List<DersModel>()
+        {
+            new DersModel() { dersID = 1, dersAdi = "Programlamaya Giriş" },
+            new DersModel() { dersID = 2, dersAdi = "Mühendisliğe Giriş" },
+            new DersModel() { dersID = 3, dersAdi = "Fizik 1" },
+            new DersModel() { dersID = 4, dersAdi = "Matematik 1" },
+            new DersModel() {  dersID = 5, dersAdi = "Lineer Cebir" },
+            new DersModel() { dersID = 6, dersAdi = "Algoritma Analizi" },
+            new DersModel() { dersID = 6, dersAdi = "Algoritma Analizi" },
+            new DersModel() { dersID = 7, dersAdi = "Görsel Programlama" },
+            new DersModel() { dersID = 8, dersAdi = "Bilgisayar Ağları" },
+            new DersModel() { dersID = 9, dersAdi = "Mikroişlemciler" }
+        };
+
+        List<DerslikModel> derslikModel = new List<DerslikModel>()
+        {
+            new DerslikModel { derslikAdi = "CA25", derslikMevcut = 35 , secildiMi=false},
+            new DerslikModel { derslikAdi = "CA26", derslikMevcut = 40 , secildiMi=false},
+            new DerslikModel { derslikAdi = "CA27", derslikMevcut = 45 , secildiMi=false},
+            new DerslikModel { derslikAdi = "CA28", derslikMevcut = 50 , secildiMi=false},
+            new DerslikModel { derslikAdi = "CA29", derslikMevcut = 55 , secildiMi=false},
+            new DerslikModel { derslikAdi = "CA30", derslikMevcut = 60 , secildiMi=false }
+
+        };
+
+        List<DonemModel> donemModel = new List<DonemModel>()
+        {
+            new DonemModel() { donemID = 1, donemAdi = "Güz" },
+            new DonemModel() { donemID= 2, donemAdi = "Bahar" },
+            new DonemModel() { donemID= 3, donemAdi= "Yaz Okulu" }
+        };
+
+        public ActionResult Index()
+        {
+            ViewBag.dersModel = new SelectList(dersModel, "dersID", "dersAdi");
+            SinavModel sm = new SinavModel();
+            sm.Dersler = dersModel;
+            sm.Derslik = derslikModel;
+            sm.Donem = donemModel;
+            return View(sm);
+        }
+
+        [HttpPost]
+        public ActionResult Index(string ders, bool derslik, string donem)
+        {
+            ViewBag.Data1 = ders;
+            ViewBag.Data2 = derslik;
+            ViewBag.Data3 = donem;
+            TempData["dersler"] = ViewBag.Data1;
+            TempData["derslikler"] = ViewBag.Data2;
+            TempData["sinavDonemi"] = ViewBag.Data3;
+            return View();
+        }
+
+        [HttpPost]
+        public ActionResult SinavBilgi()
+        {
+            foreach (var derslik in derslikModel)
+            {
+                if (derslik.secildiMi)
+                {
+                    int derslikID = derslik.derslikMevcut;
+                    derslikMevcudu += derslikID;
+                }
+            }
+            return View();
+        }
+
+        [HttpPost]
+        public ActionResult SinavBilgi(bool derslik)
+        {
+            ViewBag.Data1 = Request.Form["ders"];
+            ViewBag.Data2 = Request.Form.GetValues("derslik")[0];
+            ViewBag.Data3 = Request.Form["donem"];
+            TempData["dersler"] = ViewBag.Data1;
+            TempData["derslikler"] = ViewBag.Data2;
+            TempData["sinavDonemi"] = ViewBag.Data3;
+            return View();
+        }
+
+        [HttpPost]
+        public ActionResult Success(HttpPostedFileBase excelfile)
+        {
+            if (excelfile == null || excelfile.ContentLength == 0)
+            {
+                ViewBag.Error = "Lütfen bir excel dosyası seçiniz...<br>";
+                return View("Index");
+            }
+            else
+            {
+                if (excelfile.FileName.EndsWith("xls") || excelfile.FileName.EndsWith("xlsx"))
+                {
+                    string path = Server.MapPath("~/Content/" + excelfile.FileName);
+                    if (System.IO.File.Exists(path))
+                        System.IO.File.Delete(path);
+                    excelfile.SaveAs(path);
+
+                    Excel.Application application = new Excel.Application();
+                    Excel.Workbook workbook = application.Workbooks.Open(path);
+                    Excel.Worksheet worksheet = workbook.ActiveSheet;
+                    Excel.Range range = worksheet.UsedRange;
+
+                    List<Product> listProducts = new List<Product>();
+                    for (int row = 2; row < range.Rows.Count; row++)
+                    {
+                        Product p = new Product();
+                        p.ID = ((Excel.Range)range.Cells[row, 1]).Text;
+                        p.Adi = ((Excel.Range)range.Cells[row, 2]).Text;
+                        p.Soyadi = ((Excel.Range)range.Cells[row, 3]).Text;
+                        p.Numarasi = ((Excel.Range)range.Cells[row, 4]).Text;
+                        listProducts.Add(p);
+                    }
+                    ViewBag.ListProducts = listProducts;
+                    TempData["listpProductss"] = ViewBag.ListProducts;
+                    return View();
+                }
+                else
+                {
+                    ViewBag.Error = "Dosya türü yanlış...<br>";
+                    return View("Index");
+                }
+            }
+        }
+
+        public ActionResult Import()
+        {
+            ViewBag.ListProducts = TempData["listpProductss"];
+            return View();
+        }
+        public ActionResult Success()
+        {
+            ViewBag.ListProducts = TempData["listpProductss"];
+            return View();
+        }
+        public ActionResult Pdf()
+        {
+            ViewBag.ListProducts = TempData["listpProductss"];
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateInput(false)]
+        public FileResult Export(string GridHtml)
+        {
+            using (MemoryStream stream = new System.IO.MemoryStream())
+            {
+                StringReader sr = new StringReader(GridHtml);
+                Document pdfDoc = new Document(PageSize.A4, 10f, 10f, 100f, 0f);
+                PdfWriter writer = PdfWriter.GetInstance(pdfDoc, stream);
+                pdfDoc.Open();
+                XMLWorkerHelper.GetInstance().ParseXHtml(writer, pdfDoc, sr);
+                pdfDoc.Close();
+                return File(stream.ToArray(), "application/pdf", "Grid.pdf");
+            }
+        }
+    }
+}
